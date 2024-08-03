@@ -1,21 +1,29 @@
-from engine import Value
+from micrograd_plus.engine import Value
 import random
 
-class Neuron:
-  
-  def __init__(self, nin):
+class Module:
+  def zero_grad(self):
+    for p in self.parameters():
+      p.grad = 0
+
+  def parameters(self):
+    return []
+
+class Neuron(Module):
+  def __init__(self, nin, nonLin = True):
     self.w = [Value(random.uniform(-1,1)) for _ in range(nin)]
     self.b = Value(random.uniform(-1,1))
+    self.nonLin = nonLin
   
   def __call__(self, x):
     act = sum((wi*xi for wi, xi in zip(self.w, x)), self.b)
     out = act.tanh()
-    return out
+    return out if self.nonLin else act
   
   def parameters(self):
     return self.w + [self.b]
 
-class Layer:
+class Layer(Module):
   
   def __init__(self, nin, nout):
     self.neurons = [Neuron(nin) for _ in range(nout)]
@@ -23,11 +31,11 @@ class Layer:
   def __call__(self, x):
     outs = [n(x) for n in self.neurons]
     return outs[0] if len(outs) == 1 else outs
-  
+
   def parameters(self):
     return [p for neuron in self.neurons for p in neuron.parameters()]
 
-class MLP:
+class MLP(Module):
   
   def __init__(self, nin, nouts):
     sz = [nin] + nouts

@@ -5,37 +5,15 @@ from graphviz import Digraph
 
 class Value:
   #represents a value object - a scalar value and it's gradient
-
   def __init__(self, data, _children=(), _op="", label = ""):
     self.data = data
-    self._prev = set(_children)
+    self.grad = 0.0
     self._op = _op
     self.label = label
-    self.grad = 0.0
+    self._prev = set(_children)
     self._backward = lambda: None
-  
-  def tanh(self):
-    x = self.data
-    t = (math.exp(2*x)-1)/(math.exp(2*x)+1)
-    out = Value(t, (self,), "tanh")
 
-    def _backward():
-      self.grad += (1 - t ** 2) * out.grad
-    out._backward = _backward
-    
-    return out 
-  
-  def exp(self):
-    x = self.data
-    e = math.exp(x)
-    out = Value(e, (self,), "exp")
-
-    def _backward():
-      self.grad = e * out.grad
-    out._backward = _backward
-
-    return out
-  
+  # backward pass (calculate grads)
   def backward(self):
     # topological sort
     topo = []
@@ -52,6 +30,40 @@ class Value:
     for node in reversed(topo):
       node._backward()
 
+  # activation functions
+  def sigmoid(self):
+    x = self.data
+    t = 1 / (1 + math.exp(-x))
+    out = Value(t, (self,), "sigmoid")
+
+    def _backward():
+      self.grad += t * (1 - t) * out.grad
+    out._backward = _backward
+
+    return out
+
+  def relu(self):
+    t = 0 if self.data < 0 else self.data
+    out = Value(t, (self,), "relu")
+
+    def _backward():
+      self.grad += (t > 0) * out.grad
+    out._backward = _backward
+
+    return out
+  
+  def tanh(self):
+    x = self.data
+    t = (math.exp(2*x)-1)/(math.exp(2*x)+1)
+    out = Value(t, (self,), "tanh")
+
+    def _backward():
+      self.grad += (1 - t ** 2) * out.grad
+    out._backward = _backward
+    
+    return out 
+
+  # draw function to visualize
   def draw(self):
     def trace(root):
       # builds a set of all nodes and edges in a graph
@@ -83,6 +95,18 @@ class Value:
       dot.edge(str(id(n1)), str(id(n2)) + n2._op)
 
     return dot
+  
+  # math
+  def exp(self):
+    x = self.data
+    e = math.exp(x)
+    out = Value(e, (self,), "exp")
+
+    def _backward():
+      self.grad = e * out.grad
+    out._backward = _backward
+
+    return out
   
   def __add__(self, other):
     other = other if isinstance(other, Value) else Value(other)
